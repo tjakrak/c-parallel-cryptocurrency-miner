@@ -4,6 +4,7 @@
 
 /******************** See RFC 4634 for details ******************/
 /*
+*  @file
 *  Description:
 *      This file implements the Secure Hash Signature Standard
 *      algorithms as defined in the National Institute of Standards
