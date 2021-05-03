@@ -49,13 +49,16 @@ uint32_t difficulty_mask = 0;
 
 int buffer = 0;
 uint64_t last_index = 0;
+int range = 100;
 struct tasks {
     uint64_t start;
     uint64_t end;
 } *tsk;
 
+
 uint64_t nonce_result = 0;
 char solution[41];
+
 
 double get_time()
 {
@@ -111,33 +114,30 @@ uint64_t mine(char *data_block, uint32_t difficulty_mask,
 
 void *consumer_thread(void *ptr) {
 
-    while (last_index < UINT64_MAX / 100 / num_threads && nonce_result == 0) {
+    while (last_index < UINT64_MAX / range / num_threads && nonce_result == 0) {
         pthread_mutex_lock(&mutex);
-        //int x = (int) ptr;
+        long thd_num = (unsigned long) ptr;
 
-        //struct tasks *t = (struct tasks*) ptr;
-        while (buffer < 1 || last_index >= UINT64_MAX / 100 / num_threads) {
+        while (buffer < 1 || last_index >= UINT64_MAX / range / num_threads) {
             if (last_index >= UINT64_MAX / 100 / num_threads || nonce_result != 0) {
-                //printf("Threads %d EXIT HERE\n", x);
+                
+                printf("Threads %ld EXIT HERE\n", thd_num);
                 printf("Last Index = %lu\n", last_index); 
-                //pthread_cond_signal(&condp);
+
                 pthread_mutex_unlock(&mutex); 
                 return 0;
             }
-
             pthread_cond_wait(&condc, &mutex);
-
         }
         
         int real_index = last_index % 100;
-        printf("Struct value: %lu, %lu\n", tsk[real_index].start, tsk[real_index].end);
-        //printf("Threads: %d Struct value: %lu, %lu\n", x, tsk[real_index].start, tsk[real_index].end);
+        printf("Threads: %ld Struct value: %lu, %lu\n", thd_num, tsk[real_index].start, tsk[real_index].end);
 
         uint64_t start = tsk[real_index].start;
         uint64_t end = tsk[real_index].end;
 
         last_index++;
-        buffer--; // Deceremented the buffer we have (total number of struct in the array)
+        buffer--; // Decremented the buffer we have (total number of struct in the array)
 
         pthread_cond_signal(&condc);
         pthread_mutex_unlock(&mutex);
@@ -151,6 +151,7 @@ void *consumer_thread(void *ptr) {
             start, end,
             digest); 
 
+        /* When printed in hex, a SHA-1 checksum will be 40 characters. */
         char solution_hash[41];
         sha1tostring(solution_hash, digest);
         
@@ -163,8 +164,6 @@ void *consumer_thread(void *ptr) {
             }
             pthread_cond_broadcast(&condc);
             printf("Hash: %s\n", solution_hash);
-//            pthread_mutex_unlock(&mutex);
-//            return 0;
         }
         
         printf("lastindex: %lu\n", last_index);
@@ -220,21 +219,18 @@ int main(int argc, char *argv[]) {
     double start_time = get_time();
 
     // generate little task (creating a struct)
-    // struct - difficulty, block data, nonce range
+    // struct - range (start and end)
     tsk = malloc(100 * sizeof(struct tasks));
     
-    int range = 100;
-
-    pthread_t *consumers = malloc(sizeof(pthread_t) * 5);
+    pthread_t *consumers = malloc(sizeof(pthread_t) * num_threads);
     int i;
     for (i = 0; i < num_threads; i++) {
-        //pthread_create(&consumers[i], NULL, consumer_thread, (void *) i);
-        pthread_create(&consumers[i], NULL, consumer_thread, NULL);
+        pthread_create(&consumers[i], NULL, consumer_thread, (void *) (unsigned long) i);
     }
 
-    // Producer
+    /* Producer */
     uint64_t j = 0;    
-    while (j < UINT64_MAX && nonce_result == 0) {
+    while (j < UINT64_MAX / range && nonce_result == 0) {
         j++;
 
         pthread_mutex_lock(&mutex);
@@ -243,17 +239,11 @@ int main(int argc, char *argv[]) {
             if (nonce_result != 0) {
                 break;
             }
- 
             pthread_cond_wait(&condp, &mutex);
-
-//            if (nonce_result != 0) {
-//                break;
-//            }
         }       
         
         int idx = (j - 1) % 100;
         
-//        printf("INDEX = %d\n", idx);
         tsk[idx].start = (j - 1) * range + 1;
         tsk[idx].end = tsk[idx].start + range - 1;
         
@@ -276,30 +266,13 @@ int main(int argc, char *argv[]) {
 
 
     printf("final buffer= %d\n", buffer);
-    //free(consumers);
-    //free(tsk);
-
-
-
-//    uint8_t digest[SHA1_HASH_SIZE];
-//
-//    /* Mine the block. */
-//    uint64_t nonce = mine(
-//            bitcoin_block_data,
-//            difficulty_mask,
-//            1, UINT64_MAX,
-//            digest);
 
     double end_time = get_time();
 
-//    if (nonce == 0) {
-//        printf("No solution found!\n");
-//        return 1;
-//    }
-
-    /* When printed in hex, a SHA-1 checksum will be 40 characters. */
-//    char solution_hash[41];
-//    sha1tostring(solution_hash, digest);
+    if (nonce_result == 0) {
+        printf("No solution found!\n");
+        return 1;
+    }
 
     printf("Solution found by thread %d:\n", 0);
     printf("Nonce: %lu\n", nonce_result);
@@ -310,6 +283,9 @@ int main(int argc, char *argv[]) {
     double total_time = end_time - start_time;
     printf("%llu hashes in %.2fs (%.2f hashes/sec)\n",
             total_inversions, total_time, total_inversions / total_time);
+
+    free(consumers);
+    free(tsk);
 
     return 0;
 }
