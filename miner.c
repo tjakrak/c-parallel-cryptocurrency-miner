@@ -42,23 +42,22 @@ pthread_cond_t condp = PTHREAD_COND_INITIALIZER;
 
 
 unsigned long long total_inversions;
-char *bitcoin_block_data;
-int num_threads;
-uint32_t difficulty_mask = 0;
+char *bitcoin_block_data; /* string input from the user */
+int num_threads; /* number of threads */
+uint32_t difficulty_mask = 0; /* difficulty */
 
 
-int buffer = 0;
-uint64_t last_index = 0;
-int range = 100;
+int buffer = 0; /* the number of structs in the array created by the producer */
+uint64_t last_index = 0; /* the number of structs processed by the consumers */
+int range = 100; /* the arbitrary range that will be processed the threads (consumer) each time*/
 struct tasks {
     uint64_t start;
     uint64_t end;
 } *tsk;
 
-
-uint64_t nonce_result = 0;
-char solution[41];
-
+uint64_t nonce_result = 0; /* meaning we havent found the solution yet */
+char solution[41]; /* constant char to store the hash solution we get from miner */
+int thread_found_solution; /* storing which thread found the solution */
 
 double get_time()
 {
@@ -114,10 +113,13 @@ uint64_t mine(char *data_block, uint32_t difficulty_mask,
 
 void *consumer_thread(void *ptr) {
 
-    while (last_index < UINT64_MAX / range / num_threads && nonce_result == 0) {
+    /* the consumer will keep consuming the structs until either we haven't reach the maximum iteration of UINT64_MAX
+     * and haven't find the result yet. (can see from nonce_result = 0)'*/ 
+     while (last_index < UINT64_MAX / range / num_threads && nonce_result == 0) {
         pthread_mutex_lock(&mutex);
         long thd_num = (unsigned long) ptr;
 
+        // the consumer will waiting if there is no struct left in the buffer
         while (buffer < 1 || last_index >= UINT64_MAX / range / num_threads) {
             if (last_index >= UINT64_MAX / 100 / num_threads || nonce_result != 0) {
                 
@@ -127,17 +129,21 @@ void *consumer_thread(void *ptr) {
                 pthread_mutex_unlock(&mutex); 
                 return 0;
             }
+
+            // waking up the producer to produce more structs
             pthread_cond_wait(&condc, &mutex);
         }
         
+        // circular array
         int real_index = last_index % 100;
         printf("Threads: %ld Struct value: %lu, %lu\n", thd_num, tsk[real_index].start, tsk[real_index].end);
 
+        // grabbing the struct from the array
         uint64_t start = tsk[real_index].start;
         uint64_t end = tsk[real_index].end;
 
-        last_index++;
-        buffer--; // Decremented the buffer we have (total number of struct in the array)
+        last_index++; // update the number of struct has been consumed so far
+        buffer--; // decremented the buffer we have (updating the number of struct in the array)
 
         pthread_cond_signal(&condc);
         pthread_mutex_unlock(&mutex);
@@ -161,7 +167,9 @@ void *consumer_thread(void *ptr) {
             if (nonce_result == 0 || nonce < nonce_result) {
                 strcpy(solution, &solution_hash[0]);
                 nonce_result = nonce;
+                thread_found_solution = thd_num;
             }
+            /* waking up all the other threads (letting them know nonce has been found)*/
             pthread_cond_broadcast(&condc);
             printf("Hash: %s\n", solution_hash);
         }
@@ -179,7 +187,7 @@ void *consumer_thread(void *ptr) {
 
 
 int main(int argc, char *argv[]) {
-    
+
     if (argc != 4) {
         printf("Usage: %s threads difficulty 'block data (string)'\n", argv[0]);
         return EXIT_FAILURE;
@@ -200,6 +208,7 @@ int main(int argc, char *argv[]) {
     
     int num_difficulty = (int)strtol(argv[2], NULL, 10);
     
+    // pushing the number of bits to the left each time
     for (int i = 0; i < 32 - num_difficulty; i++) {
         difficulty_mask = difficulty_mask | 1 << i;
     }
@@ -221,7 +230,8 @@ int main(int argc, char *argv[]) {
     // generate little task (creating a struct)
     // struct - range (start and end)
     tsk = malloc(100 * sizeof(struct tasks));
-    
+
+    // allocating memory and initiating the consumer threads
     pthread_t *consumers = malloc(sizeof(pthread_t) * num_threads);
     int i;
     for (i = 0; i < num_threads; i++) {
@@ -251,13 +261,15 @@ int main(int argc, char *argv[]) {
 
         buffer++;
 //        printf("buffer = %d\n", buffer);
-       
+        
+        // waking up the consumer
         pthread_cond_signal(&condc); 
         pthread_mutex_unlock(&mutex);
     }
 
 
 
+    // joining all the consumer threads
     int k;
     for (k = 0; k < num_threads; k++) {
         printf("join: %d\n", k);
@@ -274,11 +286,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("Solution found by thread %d:\n", 0);
+    printf("Solution found by thread %d:\n", thread_found_solution);
     printf("Nonce: %lu\n", nonce_result);
-//    printf(" Hash: %s\n", solution_hash);
-
-    printf("Solution hash %s\n", solution);
+    printf(" Hash: %s\n", solution);
 
     double total_time = end_time - start_time;
     printf("%llu hashes in %.2fs (%.2f hashes/sec)\n",
