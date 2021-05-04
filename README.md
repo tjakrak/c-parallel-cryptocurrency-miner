@@ -5,9 +5,11 @@ See spec here: https://www.cs.usfca.edu/~mmalensek/cs521/assignments/project-3.h
 ## Overview
 Hashcash is a proof-of-work system, using computationally expensive problem to prove its action is legitimate. In the past, this has been used to limit email spam and denial-of-service attacks. Nowadays, it is being used in all cryptocurrencies such as: Bitcoin, Etherium, Dogecoin and others as part of the mining algorithm.
 
-Using this idea, we are creating our own <i>"cryptocurrency"</i>.
+Using this idea, we are creating our own <i>"cryptocurrency"</i> and the only way to mine it is to perform hash inversions to look for the correct nonce (number only used once) when combined with the block data it will produce a hash code with a set amount of leading zeros. The leading zeros is determined by the number of difficulty the user set. The more zeros we have, the computation will be harder and takes more time.
 
-The goal of this project is to be able to understand:
+In order to reduce the computation time, one of the solution is to parallelize it using the pthreads library. With more threads, we will be able to increase the probability to find the solution in a shorter amount of time.
+
+<b> The goal of this project is to be able to understand: </b>
 - The pthread library and parallelization using threads
 - The producer/consumer paradigm
 - Taking performance measurements
@@ -59,3 +61,5 @@ Nonce: 334
 - ```make test``` - To test the whole tests
 - ```make test run=x``` - To test specific case of x, where x is the test number
 - ```make test run={x, y, ..., z}``` - To test few specific cases where {x, y, ...., z} is the test number
+
+
