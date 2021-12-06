@@ -1,6 +1,4 @@
-# Project 3: Parallel Cryptocurrency Miner (v 1.0)
-
-See spec here: https://www.cs.usfca.edu/~mmalensek/cs521/assignments/project-3.html
+# Parallel Cryptocurrency Miner (v 1.0)
 
 ## Overview
 Hashcash is a proof-of-work system, using computationally expensive problem to prove its action is legitimate. In the past, this has been used to limit email spam and denial-of-service attacks. Nowadays, it is being used in all cryptocurrencies such as: Bitcoin, Etherium, Dogecoin and others as part of the mining algorithm.
@@ -63,3 +61,4 @@ Nonce: 334
 - ```make test run={x, y, ..., z}``` - To test few specific cases where {x, y, ...., z} is the test number
 
 
+Link: https://www.cs.usfca.edu/~mmalensek/cs521/assignments/project-3.html
